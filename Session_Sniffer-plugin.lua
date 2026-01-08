@@ -1,7 +1,7 @@
 -- Author: IB_U_Z_Z_A_R_Dl
--- Description: Plugin for GTA V Session Sniffer project on GitHub.
--- Allows you to automatically have every usernames showing up on GTA V Session Sniffer project, by logging all players from your sessions to "Cherax\Lua\GTA_V_Session_Sniffer-plugin\log.txt".
--- GitHub Repository: https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-Cherax-Lua
+-- Description: Plugin for Session Sniffer project on GitHub.
+-- Allows you to automatically have every usernames showing up on Session Sniffer project, by logging all players from your sessions to "Cherax\Lua\Session_Sniffer-plugin\log.txt".
+-- GitHub Repository: https://github.com/Illegal-Services/Session_Sniffer-plugin-Cherax-Lua
 
 
 -- Globals START
@@ -12,9 +12,9 @@ local player_join__timestamps = {}
 ---- Global variables END
 
 ---- Global constants START
-local SCRIPT_NAME <const> = "GTA_V_Session_Sniffer-plugin.lua"
-local SCRIPT_TITLE <const> = "GTA V Session Sniffer"
-local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\GTA_V_Session_Sniffer-plugin\\log.txt"
+local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
+local SCRIPT_TITLE <const> = "Session Sniffer"
+local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
 local NATIVES <const> = {
     --[[
     Scrapped from: https://alloc8or.re/gta5/nativedb/
