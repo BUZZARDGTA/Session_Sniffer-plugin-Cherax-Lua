@@ -1,7 +1,7 @@
 -- Author: IB_U_Z_Z_A_R_Dl
 -- Description: Plugin for Session Sniffer project on GitHub.
 -- Allows you to automatically have every usernames showing up on Session Sniffer project, by logging all players from your sessions to "Cherax\Lua\Session_Sniffer-plugin\log.txt".
--- GitHub Repository: https://github.com/Illegal-Services/Session_Sniffer-plugin-Cherax-Lua
+-- GitHub Repository: https://github.com/BUZZARDGTA/Session_Sniffer-plugin-Cherax-Lua
 
 
 -- Globals START
@@ -9,12 +9,14 @@
 local mainLoopThread
 local playerLeaveEventListener
 local player_join__timestamps = {}
+local last_logger_scan_timestamp = 0
 ---- Global variables END
 
 ---- Global constants START
 local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
 local SCRIPT_TITLE <const> = "Session Sniffer"
 local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
+local LOGGER_SCAN_INTERVAL_SECONDS <const> = 1
 local NATIVES <const> = {
     --[[
     Scrapped from: https://alloc8or.re/gta5/nativedb/
@@ -179,70 +181,78 @@ end
 SessionSnifferLogging_Feat = FeatureMgr.AddFeature(Utils.Joaat("SessionSnifferLogging"), "Toggle Session Sniffer Logging", eFeatureType.Toggle, "Toggle Session Sniffer Logging")
 
 ClickGUI.AddTab(SCRIPT_TITLE, function()
-	if ClickGUI.BeginCustomChildWindow("Session Sniffer Logging") then
-    	ClickGUI.RenderFeature(Utils.Joaat("SessionSnifferLogging"))
-		ClickGUI.EndCustomChildWindow()
-	end
+    if ClickGUI.BeginCustomChildWindow("Session Sniffer Logging") then
+        ClickGUI.RenderFeature(Utils.Joaat("SessionSnifferLogging"))
+        ClickGUI.EndCustomChildWindow()
+    end
 end)
 
 
 -- === Main Loop === --
 mainLoopThread = Script.RegisterLooped(function()
     if FeatureMgr.IsFeatureToggled(Utils.Joaat("SessionSnifferLogging")) then
-        if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
-            create_empty_file(SCRIPT_LOG__PATH)
-        end
+        local currentTimestamp = Time.GetEpoche()
 
-        local log__content, err = read_file(SCRIPT_LOG__PATH)
-        if err then
-            handle_script_exit({ hasScriptCrashed = true })
-            return
-        end
+        if currentTimestamp - last_logger_scan_timestamp >= LOGGER_SCAN_INTERVAL_SECONDS then
+            last_logger_scan_timestamp = currentTimestamp
 
-        if is_file_string_need_newline_ending(log__content) then
-            local file, err = io.open(SCRIPT_LOG__PATH, "a")
+            if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
+                create_empty_file(SCRIPT_LOG__PATH)
+            end
+
+            local log__content, err = read_file(SCRIPT_LOG__PATH)
             if err then
                 handle_script_exit({ hasScriptCrashed = true })
                 return
             end
 
-            file:write("\n")
-            file:close()
-        end
+            if is_file_string_need_newline_ending(log__content) then
+                local file, err = io.open(SCRIPT_LOG__PATH, "a")
+                if err then
+                    handle_script_exit({ hasScriptCrashed = true })
+                    return
+                end
 
-        if Natives.InvokeBool(NATIVES.NETWORK.NETWORK_IS_SESSION_STARTED) then
-            local player_entries_to_log = {}
-            local currentTimestamp = Time.GetEpoche()
+                file:write("\n")
+                file:close()
+            end
 
-            for _, playerID in pairs(Players.Get()) do
-                -- Getting the player SCID and IP in Cherax is cringe
-                local CNetGamePlayer = Players.GetById(playerID)
-                if CNetGamePlayer then
-                    local GamerInfo = CNetGamePlayer:GetGamerInfo()
-                    if GamerInfo then
-                        if GamerInfo.RockstarId then
-                            local playerSCID = GamerInfo.RockstarId
-                            local playerName = Players.GetName(playerID)
-                            local playerIPString = Players.GetIPString(playerID)
-                            if playerIPString then
-                                local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)") -- cringe
+            if Natives.InvokeBool(NATIVES.NETWORK.NETWORK_IS_SESSION_STARTED) then
+                local player_entries_to_log = {}
+                local currentTimestamp = Time.GetEpoche()
 
-                                loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerID, playerSCID, playerName, playerIP)
+                for _, playerID in pairs(Players.Get()) do
+                    -- Getting the player SCID and IP in Cherax is cringe
+                    local CNetGamePlayer = Players.GetById(playerID)
+                    if CNetGamePlayer then
+                        local GamerInfo = CNetGamePlayer:GetGamerInfo()
+                        if GamerInfo then
+                            if GamerInfo.RockstarId then
+                                local playerSCID = GamerInfo.RockstarId
+                                local playerName = Players.GetName(playerID)
+                                local playerIPString = Players.GetIPString(playerID)
+                                if playerIPString then
+                                    local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)") -- cringe
 
-                                Script.Yield()
+                                    loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerID, playerSCID, playerName, playerIP)
+
+                                    Script.Yield()
+                                end
                             end
                         end
                     end
                 end
-            end
 
-            if #player_entries_to_log > 0 then
-                write_to_log_file(player_entries_to_log)
-            end
+                if #player_entries_to_log > 0 then
+                    write_to_log_file(player_entries_to_log)
+                end
 
-        else
-            player_join__timestamps = {}
+            else
+                player_join__timestamps = {}
+            end
         end
+    else
+        last_logger_scan_timestamp = 0
     end
 
     Script.Yield()
