@@ -33,7 +33,6 @@ local function make_dedup_key(scid, ip, name)
     return scid .. ":" .. ip .. ":" .. name
 end
 
--- Load existing entries once at startup to allow O(1) duplicate checks without reading disk
 local function init_log_cache()
     local dir = SCRIPT_LOG__PATH:match("^(.*)[/\\]")
     if dir and not FileMgr.DoesFileExist(dir) then
@@ -98,6 +97,16 @@ end)
 init_log_cache()
 
 
+-- === Event Handlers ===
+EventMgr.RegisterHandler(eLuaEvent.ON_PLAYER_JOIN, function()
+    last_logger_scan_timestamp = 0
+end)
+
+EventMgr.RegisterHandler(eLuaEvent.ON_SESSION_CHANGE, function()
+    last_logger_scan_timestamp = 0
+end)
+
+
 -- === Main Loop ===
 mainLoopThread = Script.RegisterLooped(function()
     if FeatureMgr.IsFeatureToggled(FEATURE_SESSION_SNIFFER_LOGGING_HASH) then
@@ -106,7 +115,6 @@ mainLoopThread = Script.RegisterLooped(function()
         if currentTimestamp - last_logger_scan_timestamp >= LOGGER_SCAN_INTERVAL_SECONDS then
             last_logger_scan_timestamp = currentTimestamp
 
-            -- Only scan if in an active online session; zero disk/CPU cost otherwise
             if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
                 local player_entries_to_log = {}
 
