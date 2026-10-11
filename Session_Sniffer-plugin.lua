@@ -70,32 +70,15 @@ function read_file(file_path)
     return content, nil
 end
 
-local function is_thread_running(threadId)
-    if threadId and util.is_scheduled_in(threadId) then
-        return true
-    end
-
-    return false
-end
-
-local function delete_thread(threadId)
-    if threadId then
-        EventMgr.RemoveHandler(threadId)
-    end
-end
-
 local function handle_script_exit(params)
     params = params or {}
     if params.hasScriptCrashed == nil then
         params.hasScriptCrashed = false
     end
 
-    if is_thread_running(mainLoopThread) then
-        delete_thread(mainLoopThread)
-    end
-
-    if is_thread_running(playerLeaveEventListener) then
-        delete_thread(playerLeaveEventListener)
+    if playerLeaveEventListener then
+        EventMgr.RemoveHandler(playerLeaveEventListener)
+        playerLeaveEventListener = nil
     end
 
     if params.hasScriptCrashed then
