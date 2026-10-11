@@ -28,33 +28,7 @@ local function handle_script_exit(params)
     SetShouldUnload()
 end
 
-local function create_empty_file(filepath)
-    local dir = filepath:match("^(.*)[/\\]")
-    if dir then
-        FileMgr.CreateDir(dir)
-    end
 
-    local file, err = io.open(filepath, "w")
-    if err then
-        handle_script_exit({ hasScriptCrashed = true })
-        return
-    end
-
-    file:close()
-end
-
-local function read_file(file_path)
-    local file, err = io.open(file_path, "r")
-    if err then
-        return nil, err
-    end
-
-    local content = file:read("*a")
-
-    file:close()
-
-    return content, nil
-end
 
 local function make_dedup_key(scid, ip, name)
     return scid .. ":" .. ip .. ":" .. name
@@ -62,14 +36,19 @@ end
 
 -- Load existing entries once at startup to allow O(1) duplicate checks without reading disk
 local function init_log_cache()
+    local dir = SCRIPT_LOG__PATH:match("^(.*)[/\\]")
+    if dir and not FileMgr.DoesFileExist(dir) then
+        FileMgr.CreateDir(dir)
+    end
+
     if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
-        create_empty_file(SCRIPT_LOG__PATH)
+        FileMgr.WriteFileContent(SCRIPT_LOG__PATH, "", false)
         GUI.AddToast(SCRIPT_TITLE, "Initialized new log file.", 5000)
         return
     end
 
-    local content, err = read_file(SCRIPT_LOG__PATH)
-    if err or not content then
+    local content = FileMgr.ReadFileContent(SCRIPT_LOG__PATH)
+    if not content or #content == 0 then
         return
     end
 
@@ -86,12 +65,8 @@ local function init_log_cache()
     end
 
     -- Ensure the file ends with a trailing newline if it has content
-    if #content > 0 and content:sub(-1) ~= "\n" then
-        local file = io.open(SCRIPT_LOG__PATH, "a")
-        if file then
-            file:write("\n")
-            file:close()
-        end
+    if content:sub(-1) ~= "\n" then
+        FileMgr.WriteFileContent(SCRIPT_LOG__PATH, "\n", true)
     end
 
     GUI.AddToast(
@@ -102,18 +77,10 @@ local function init_log_cache()
 end
 
 local function write_to_log_file(player_entries_to_log)
-    local log_file, err = io.open(SCRIPT_LOG__PATH, "a")
-    if err then
-        create_empty_file(SCRIPT_LOG__PATH)
-        log_file, err = io.open(SCRIPT_LOG__PATH, "a")
-        if err then
-            handle_script_exit({ hasScriptCrashed = true })
-            return
-        end
+    local combined_entries = table.concat(player_entries_to_log, "\n") .. "\n"
+    if not FileMgr.WriteFileContent(SCRIPT_LOG__PATH, combined_entries, true) then
+        handle_script_exit({ hasScriptCrashed = true })
     end
-
-    log_file:write(table.concat(player_entries_to_log, "\n") .. "\n")
-    log_file:close()
 end
 
 
