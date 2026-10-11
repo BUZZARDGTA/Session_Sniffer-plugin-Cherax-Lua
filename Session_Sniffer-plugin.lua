@@ -128,32 +128,28 @@ mainLoopThread = Script.RegisterLooped(function()
             if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
                 local player_entries_to_log = nil
 
-                for _, playerID in pairs(Players.Get()) do
+                for _, playerID in ipairs(Players.Get()) do
                     local CNetGamePlayer = Players.GetById(playerID)
                     if CNetGamePlayer and not CNetGamePlayer:IsLocalPlayer() then
                         local GamerInfo = CNetGamePlayer:GetGamerInfo()
-                        if GamerInfo and GamerInfo.RockstarId then
-                            local playerSCID = GamerInfo.RockstarId
-                            local playerName = CNetGamePlayer:GetName()
-                            local playerIPString = Players.GetIPString(playerID)
+                        local playerSCID = GamerInfo and GamerInfo.RockstarId
 
+                        if playerSCID and playerSCID > 0 then
+                            local playerIPString = Players.GetIPString(playerID)
                             if playerIPString then
                                 local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)")
-                                if (
-                                    playerIP
-                                    and playerIP ~= "255.255.255.255"
-                                    and playerIP ~= "0.0.0.0"
-                                    and playerName
-                                    and playerName ~= ""
-                                ) then
-                                    local key = make_dedup_key(playerSCID, playerIP, playerName)
-                                    if not logged_players[key] then
-                                        logged_players[key] = true
-                                        player_entries_to_log = player_entries_to_log or {}
-                                        player_entries_to_log[#player_entries_to_log + 1] = string.format(
-                                            "user:%s, scid:%d, ip:%s, timestamp:%d",
-                                            playerName, playerSCID, playerIP, currentTimestamp
-                                        )
+                                if playerIP and playerIP ~= "255.255.255.255" and playerIP ~= "0.0.0.0" then
+                                    local playerName = CNetGamePlayer:GetName()
+                                    if playerName and playerName ~= "" and playerName ~= "**Invalid**" then
+                                        local key = make_dedup_key(playerSCID, playerIP, playerName)
+                                        if not logged_players[key] then
+                                            logged_players[key] = true
+                                            player_entries_to_log = player_entries_to_log or {}
+                                            player_entries_to_log[#player_entries_to_log + 1] = string.format(
+                                                "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                                playerName, playerSCID, playerIP, currentTimestamp
+                                            )
+                                        end
                                     end
                                 end
                             end
