@@ -7,8 +7,6 @@
 -- Globals START
 ---- Global variables START
 local mainLoopThread
-local playerLeaveEventListener
-local player_join__timestamps = {}
 local last_logger_scan_timestamp = 0
 ---- Global variables END
 
@@ -72,15 +70,6 @@ end
 
 local function handle_script_exit(params)
     params = params or {}
-    if params.hasScriptCrashed == nil then
-        params.hasScriptCrashed = false
-    end
-
-    if playerLeaveEventListener then
-        EventMgr.RemoveHandler(playerLeaveEventListener)
-        playerLeaveEventListener = nil
-    end
-
     if params.hasScriptCrashed then
         GUI.AddToast(SCRIPT_TITLE, "Oh no... Script crashed:(\nYou gotta restart it manually.", 10000)
     end
@@ -112,16 +101,7 @@ end
 
 -- === Main Menu Features === --
 
-local function handle_player_leave(playerID)
-    player_join__timestamps[playerID] = nil
-end
-
-playerLeaveEventListener = EventMgr.RegisterHandler(eLuaEvent.ON_PLAYER_LEFT, function(f)
-    handle_player_leave(f)
-end)
-
-
-local function loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerID, playerSCID, playerName, playerIP)
+local function loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerSCID, playerName, playerIP)
     if (
         not playerSCID
         or not playerName
@@ -129,10 +109,6 @@ local function loggerPreTask(player_entries_to_log, log__content, currentTimesta
         or playerIP == "255.255.255.255"
     ) then
         return
-    end
-
-    if not player_join__timestamps[playerID] then
-        player_join__timestamps[playerID] = Time.GetEpoche()
     end
 
     local entry_pattern = string.format("user:(%s), scid:(%d), ip:(%s), timestamp:(%%d+)", escape_magic_characters(playerName), playerSCID, escape_magic_characters(playerIP))
@@ -217,7 +193,7 @@ mainLoopThread = Script.RegisterLooped(function()
                                 if playerIPString then
                                     local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)") -- cringe
 
-                                    loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerID, playerSCID, playerName, playerIP)
+                                    loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerSCID, playerName, playerIP)
 
                                     Script.Yield()
                                 end
@@ -229,9 +205,6 @@ mainLoopThread = Script.RegisterLooped(function()
                 if #player_entries_to_log > 0 then
                     write_to_log_file(player_entries_to_log)
                 end
-
-            else
-                player_join__timestamps = {}
             end
         end
     else
