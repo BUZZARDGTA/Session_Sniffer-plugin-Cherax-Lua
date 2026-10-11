@@ -101,16 +101,6 @@ end)
 init_log_cache()
 
 
--- === Event Handlers ===
-EventMgr.RegisterHandler(eLuaEvent.ON_PLAYER_JOIN, function()
-    last_logger_scan_timestamp = 0
-end)
-
-EventMgr.RegisterHandler(eLuaEvent.ON_SESSION_CHANGE, function()
-    last_logger_scan_timestamp = 0
-end)
-
-
 -- === Main Loop ===
 mainLoopThread = Script.RegisterLooped(function()
     if ShouldUnload() then
