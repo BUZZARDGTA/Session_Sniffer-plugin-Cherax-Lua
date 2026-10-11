@@ -89,7 +89,7 @@ FeatureMgr.AddFeature(
     "Toggle Session Sniffer Logging",
     eFeatureType.Toggle,
     "Toggle Session Sniffer Logging"
-):SetDefaultValue(true):SetBoolValue(true)
+):SetDefaultValue(true):Toggle(true)
 
 ClickGUI.AddTab(SCRIPT_TITLE, function()
     if ClickGUI.BeginCustomChildWindow("Session Sniffer Logging") then
