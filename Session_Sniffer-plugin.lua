@@ -7,7 +7,7 @@
 -- === Globals ===
 local mainLoopThread = nil
 local last_logger_scan_timestamp = 0
-local logged_players = {} -- Dedup set: "scid:ip:name" -> true
+local logged_players = {}
 
 -- === Constants ===
 local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
