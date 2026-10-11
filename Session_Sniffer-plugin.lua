@@ -126,7 +126,7 @@ mainLoopThread = Script.RegisterLooped(function()
             last_logger_scan_timestamp = currentTimestamp
 
             if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
-                local player_entries_to_log = {}
+                local player_entries_to_log = nil
 
                 for _, playerID in pairs(Players.Get()) do
                     local CNetGamePlayer = Players.GetById(playerID)
@@ -149,6 +149,7 @@ mainLoopThread = Script.RegisterLooped(function()
                                     local key = make_dedup_key(playerSCID, playerIP, playerName)
                                     if not logged_players[key] then
                                         logged_players[key] = true
+                                        player_entries_to_log = player_entries_to_log or {}
                                         player_entries_to_log[#player_entries_to_log + 1] = string.format(
                                             "user:%s, scid:%d, ip:%s, timestamp:%d",
                                             playerName, playerSCID, playerIP, currentTimestamp
@@ -160,7 +161,7 @@ mainLoopThread = Script.RegisterLooped(function()
                     end
                 end
 
-                if #player_entries_to_log > 0 then
+                if player_entries_to_log then
                     write_to_log_file(player_entries_to_log)
                 end
             end
