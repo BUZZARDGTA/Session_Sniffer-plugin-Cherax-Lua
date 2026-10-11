@@ -84,7 +84,12 @@ end
 
 
 -- === Main Menu Features ===
-FeatureMgr.AddFeature(FEATURE_SESSION_SNIFFER_LOGGING_HASH, "Toggle Session Sniffer Logging", eFeatureType.Toggle, "Toggle Session Sniffer Logging")
+FeatureMgr.AddFeature(
+    FEATURE_SESSION_SNIFFER_LOGGING_HASH,
+    "Toggle Session Sniffer Logging",
+    eFeatureType.Toggle,
+    "Toggle Session Sniffer Logging"
+):SetDefaultValue(true):SetBoolValue(true)
 
 ClickGUI.AddTab(SCRIPT_TITLE, function()
     if ClickGUI.BeginCustomChildWindow("Session Sniffer Logging") then
