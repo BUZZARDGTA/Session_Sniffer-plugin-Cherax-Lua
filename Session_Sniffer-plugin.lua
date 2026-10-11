@@ -150,8 +150,6 @@ mainLoopThread = Script.RegisterLooped(function()
                 end
             end
         end
-    else
-        last_logger_scan_timestamp = 0
     end
 
     Script.Yield()
