@@ -6,14 +6,14 @@
 
 -- === Globals ===
 local mainLoopThread = nil
-local last_logger_scan_timestamp = 0
+local last_player_scan_timestamp = 0
 local logged_players = {}
 
 -- === Constants ===
 local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
 local SCRIPT_TITLE <const> = "Session Sniffer"
 local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
-local LOGGER_SCAN_INTERVAL_SECONDS <const> = 1
+local PLAYER_SCAN_INTERVAL_SECONDS <const> = 1
 local NATIVE_NETWORK_IS_SESSION_STARTED <const> = 0x9DE624D2FC4B603F
 local FEATURE_SESSION_SNIFFER_LOGGING_HASH <const> = Utils.Joaat("SessionSnifferLogging")
 
@@ -110,8 +110,8 @@ mainLoopThread = Script.RegisterLooped(function()
     if FeatureMgr.IsFeatureToggled(FEATURE_SESSION_SNIFFER_LOGGING_HASH) then
         local currentTimestamp = Time.GetEpoche()
 
-        if currentTimestamp - last_logger_scan_timestamp >= LOGGER_SCAN_INTERVAL_SECONDS then
-            last_logger_scan_timestamp = currentTimestamp
+        if currentTimestamp - last_player_scan_timestamp >= PLAYER_SCAN_INTERVAL_SECONDS then
+            last_player_scan_timestamp = currentTimestamp
 
             if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
                 local player_entries_to_log = nil
