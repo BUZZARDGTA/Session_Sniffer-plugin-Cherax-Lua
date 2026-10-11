@@ -63,6 +63,7 @@ end
 local function init_log_cache()
     if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
         create_empty_file(SCRIPT_LOG__PATH)
+        GUI.AddToast(SCRIPT_TITLE, "Initialized new log file.", 5000)
         return
     end
 
@@ -71,10 +72,15 @@ local function init_log_cache()
         return
     end
 
+    local loaded_count = 0
     for line in content:gmatch("[^\r\n]+") do
         local name, scid, ip = line:match("^user:(.-), scid:(%d+), ip:([%d%.]+)")
         if name and scid and ip then
-            logged_players[make_dedup_key(scid, ip, name)] = true
+            local key = make_dedup_key(scid, ip, name)
+            if not logged_players[key] then
+                logged_players[key] = true
+                loaded_count = loaded_count + 1
+            end
         end
     end
 
@@ -86,6 +92,12 @@ local function init_log_cache()
             file:close()
         end
     end
+
+    GUI.AddToast(
+        SCRIPT_TITLE,
+        string.format("Loaded %d unique player%s from log.", loaded_count, loaded_count == 1 and "" or "s"),
+        5000
+    )
 end
 
 local function write_to_log_file(player_entries_to_log)
