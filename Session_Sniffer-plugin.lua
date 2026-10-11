@@ -15,6 +15,7 @@ local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
 local SCRIPT_TITLE <const> = "Session Sniffer"
 local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
 local LOGGER_SCAN_INTERVAL_SECONDS <const> = 1
+local FEATURE_SESSION_SNIFFER_LOGGING_HASH <const> = Utils.Joaat("SessionSnifferLogging")
 local NATIVES <const> = {
     --[[
     Scrapped from: https://alloc8or.re/gta5/nativedb/
@@ -47,7 +48,7 @@ local function escape_magic_characters(str)
     return (str:gsub(".", matches))
 end
 
-function is_file_string_need_newline_ending(str)
+local function is_file_string_need_newline_ending(str)
     if #str == 0 then
         return false
     end
@@ -55,7 +56,7 @@ function is_file_string_need_newline_ending(str)
     return str:sub(-1) ~= "\n"
 end
 
-function read_file(file_path)
+local function read_file(file_path)
     local file, err = io.open(file_path, "r")
     if err then
         return nil, err
@@ -137,11 +138,11 @@ local function write_to_log_file(player_entries_to_log)
 end
 
 
-SessionSnifferLogging_Feat = FeatureMgr.AddFeature(Utils.Joaat("SessionSnifferLogging"), "Toggle Session Sniffer Logging", eFeatureType.Toggle, "Toggle Session Sniffer Logging")
+FeatureMgr.AddFeature(FEATURE_SESSION_SNIFFER_LOGGING_HASH, "Toggle Session Sniffer Logging", eFeatureType.Toggle, "Toggle Session Sniffer Logging")
 
 ClickGUI.AddTab(SCRIPT_TITLE, function()
     if ClickGUI.BeginCustomChildWindow("Session Sniffer Logging") then
-        ClickGUI.RenderFeature(Utils.Joaat("SessionSnifferLogging"))
+        ClickGUI.RenderFeature(FEATURE_SESSION_SNIFFER_LOGGING_HASH)
         ClickGUI.EndCustomChildWindow()
     end
 end)
@@ -149,7 +150,7 @@ end)
 
 -- === Main Loop === --
 mainLoopThread = Script.RegisterLooped(function()
-    if FeatureMgr.IsFeatureToggled(Utils.Joaat("SessionSnifferLogging")) then
+    if FeatureMgr.IsFeatureToggled(FEATURE_SESSION_SNIFFER_LOGGING_HASH) then
         local currentTimestamp = Time.GetEpoche()
 
         if currentTimestamp - last_logger_scan_timestamp >= LOGGER_SCAN_INTERVAL_SECONDS then
