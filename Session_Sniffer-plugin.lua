@@ -15,6 +15,7 @@ local SCRIPT_TITLE <const> = "Session Sniffer"
 local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
 local LOGGER_SCAN_INTERVAL_SECONDS <const> = 1
 local NATIVE_NETWORK_IS_SESSION_STARTED <const> = 0x9DE624D2FC4B603F
+local NATIVE_PLAYER_PLAYER_ID <const> = 0x4F8644AF03D0E0D6
 local FEATURE_SESSION_SNIFFER_LOGGING_HASH <const> = Utils.Joaat("SessionSnifferLogging")
 
 -- === Utility Functions ===
@@ -142,32 +143,35 @@ mainLoopThread = Script.RegisterLooped(function()
             -- Only scan if in an active online session; zero disk/CPU cost otherwise
             if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
                 local player_entries_to_log = {}
+                local localPlayerID = Natives.InvokeInt(NATIVE_PLAYER_PLAYER_ID)
 
                 for _, playerID in pairs(Players.Get()) do
-                    local CNetGamePlayer = Players.GetById(playerID)
-                    if CNetGamePlayer then
-                        local GamerInfo = CNetGamePlayer:GetGamerInfo()
-                        if GamerInfo and GamerInfo.RockstarId then
-                            local playerSCID = GamerInfo.RockstarId
-                            local playerName = Players.GetName(playerID)
-                            local playerIPString = Players.GetIPString(playerID)
+                    if playerID ~= localPlayerID then
+                        local CNetGamePlayer = Players.GetById(playerID)
+                        if CNetGamePlayer then
+                            local GamerInfo = CNetGamePlayer:GetGamerInfo()
+                            if GamerInfo and GamerInfo.RockstarId then
+                                local playerSCID = GamerInfo.RockstarId
+                                local playerName = Players.GetName(playerID)
+                                local playerIPString = Players.GetIPString(playerID)
 
-                            if playerIPString then
-                                local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)")
-                                if (
-                                    playerIP
-                                    and playerIP ~= "255.255.255.255"
-                                    and playerIP ~= "0.0.0.0"
-                                    and playerName
-                                    and playerName ~= ""
-                                ) then
-                                    local key = make_dedup_key(playerSCID, playerIP, playerName)
-                                    if not logged_players[key] then
-                                        logged_players[key] = true
-                                        player_entries_to_log[#player_entries_to_log + 1] = string.format(
-                                            "user:%s, scid:%d, ip:%s, timestamp:%d",
-                                            playerName, playerSCID, playerIP, currentTimestamp
-                                        )
+                                if playerIPString then
+                                    local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)")
+                                    if (
+                                        playerIP
+                                        and playerIP ~= "255.255.255.255"
+                                        and playerIP ~= "0.0.0.0"
+                                        and playerName
+                                        and playerName ~= ""
+                                    ) then
+                                        local key = make_dedup_key(playerSCID, playerIP, playerName)
+                                        if not logged_players[key] then
+                                            logged_players[key] = true
+                                            player_entries_to_log[#player_entries_to_log + 1] = string.format(
+                                                "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                                playerName, playerSCID, playerIP, currentTimestamp
+                                            )
+                                        end
                                     end
                                 end
                             end
