@@ -4,56 +4,42 @@
 -- GitHub Repository: https://github.com/BUZZARDGTA/Session_Sniffer-plugin-Cherax-Lua
 
 
--- Globals START
----- Global variables START
-local mainLoopThread
+-- === Globals ===
+local mainLoopThread = nil
 local last_logger_scan_timestamp = 0
----- Global variables END
+local logged_players = {} -- Dedup set: "scid:ip:name" -> true
 
----- Global constants START
+-- === Constants ===
 local SCRIPT_NAME <const> = "Session_Sniffer-plugin.lua"
 local SCRIPT_TITLE <const> = "Session Sniffer"
 local SCRIPT_LOG__PATH <const> = FileMgr.GetMenuRootPath() .. "\\Lua\\Session_Sniffer-plugin\\log.txt"
 local LOGGER_SCAN_INTERVAL_SECONDS <const> = 1
+local NATIVE_NETWORK_IS_SESSION_STARTED <const> = 0x9DE624D2FC4B603F
 local FEATURE_SESSION_SNIFFER_LOGGING_HASH <const> = Utils.Joaat("SessionSnifferLogging")
-local NATIVES <const> = {
-    --[[
-    Scrapped from: https://alloc8or.re/gta5/nativedb/
 
-    This is up-to-date for b3351
-    ]]
-    NETWORK = {
-        NETWORK_IS_SESSION_STARTED = 0x9DE624D2FC4B603F
-    }
-}
----- Global constants END
-
----- Global functions START
--- Function to escape special characters in a string for Lua patterns
-local function escape_magic_characters(str)
-    local matches = {
-        ["^"] = "%^",
-        ["$"] = "%$",
-        ["("] = "%(",
-        [")"] = "%)",
-        ["%"] = "%%",
-        ["."] = "%.",
-        ["["] = "%[",
-        ["]"] = "%]",
-        ["*"] = "%*",
-        ["+"] = "%+",
-        ["-"] = "%-",
-        ["?"] = "%?"
-    }
-    return (str:gsub(".", matches))
-end
-
-local function is_file_string_need_newline_ending(str)
-    if #str == 0 then
-        return false
+-- === Utility Functions ===
+local function handle_script_exit(params)
+    params = params or {}
+    if params.hasScriptCrashed then
+        GUI.AddToast(SCRIPT_TITLE, "Oh no... Script crashed:(\nYou gotta restart it manually.", 10000)
     end
 
-    return str:sub(-1) ~= "\n"
+    SetShouldUnload()
+end
+
+local function create_empty_file(filepath)
+    local dir = filepath:match("^(.*)[/\\]")
+    if dir then
+        FileMgr.CreateDir(dir)
+    end
+
+    local file, err = io.open(filepath, "w")
+    if err then
+        handle_script_exit({ hasScriptCrashed = true })
+        return
+    end
+
+    file:close()
 end
 
 local function read_file(file_path)
@@ -69,75 +55,56 @@ local function read_file(file_path)
     return content, nil
 end
 
-local function handle_script_exit(params)
-    params = params or {}
-    if params.hasScriptCrashed then
-        GUI.AddToast(SCRIPT_TITLE, "Oh no... Script crashed:(\nYou gotta restart it manually.", 10000)
-    end
-
-    SetShouldUnload()
+local function make_dedup_key(scid, ip, name)
+    return scid .. ":" .. ip .. ":" .. name
 end
 
-local function create_empty_file(filepath)
-    -- Extract the directory part from the filepath
-    local dir = filepath:match("^(.*)[/\\]") -- Match up to the last slash or backslash
-
-    if dir then
-        -- Create only the directory
-        FileMgr.CreateDir(dir)
-    end
-
-    -- Create the file
-    local file, err = io.open(filepath, "w")
-    if err then
-        handle_script_exit({ hasScriptCrashed = true })
+-- Load existing entries once at startup to allow O(1) duplicate checks without reading disk
+local function init_log_cache()
+    if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
+        create_empty_file(SCRIPT_LOG__PATH)
         return
     end
 
-    file:close()
-end
----- Global functions END
--- Globals END
-
-
--- === Main Menu Features === --
-
-local function loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerSCID, playerName, playerIP)
-    if (
-        not playerSCID
-        or not playerName
-        or not playerIP
-        or playerIP == "255.255.255.255"
-    ) then
+    local content, err = read_file(SCRIPT_LOG__PATH)
+    if err or not content then
         return
     end
 
-    local entry_pattern = string.format("user:(%s), scid:(%d), ip:(%s), timestamp:(%%d+)", escape_magic_characters(playerName), playerSCID, escape_magic_characters(playerIP))
-    if
-        not log__content:find("^" .. entry_pattern)
-        and not log__content:find("\n" .. entry_pattern)
-    then
-        table.insert(player_entries_to_log, string.format("user:%s, scid:%d, ip:%s, timestamp:%d", playerName, playerSCID, playerIP, currentTimestamp))
+    for line in content:gmatch("[^\r\n]+") do
+        local name, scid, ip = line:match("^user:(.-), scid:(%d+), ip:([%d%.]+)")
+        if name and scid and ip then
+            logged_players[make_dedup_key(scid, ip, name)] = true
+        end
+    end
+
+    -- Ensure the file ends with a trailing newline if it has content
+    if #content > 0 and content:sub(-1) ~= "\n" then
+        local file = io.open(SCRIPT_LOG__PATH, "a")
+        if file then
+            file:write("\n")
+            file:close()
+        end
     end
 end
 
 local function write_to_log_file(player_entries_to_log)
-    if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
-        create_empty_file(SCRIPT_LOG__PATH)
-    end
-
     local log_file, err = io.open(SCRIPT_LOG__PATH, "a")
     if err then
-        handle_script_exit({ hasScriptCrashed = true })
-        return
+        create_empty_file(SCRIPT_LOG__PATH)
+        log_file, err = io.open(SCRIPT_LOG__PATH, "a")
+        if err then
+            handle_script_exit({ hasScriptCrashed = true })
+            return
+        end
     end
 
-    local combined_entries = table.concat(player_entries_to_log, "\n")
-    log_file:write(combined_entries .. "\n")
+    log_file:write(table.concat(player_entries_to_log, "\n") .. "\n")
     log_file:close()
 end
 
 
+-- === Main Menu Features ===
 FeatureMgr.AddFeature(FEATURE_SESSION_SNIFFER_LOGGING_HASH, "Toggle Session Sniffer Logging", eFeatureType.Toggle, "Toggle Session Sniffer Logging")
 
 ClickGUI.AddTab(SCRIPT_TITLE, function()
@@ -148,7 +115,11 @@ ClickGUI.AddTab(SCRIPT_TITLE, function()
 end)
 
 
--- === Main Loop === --
+-- === Initialization ===
+init_log_cache()
+
+
+-- === Main Loop ===
 mainLoopThread = Script.RegisterLooped(function()
     if FeatureMgr.IsFeatureToggled(FEATURE_SESSION_SNIFFER_LOGGING_HASH) then
         local currentTimestamp = Time.GetEpoche()
@@ -156,47 +127,36 @@ mainLoopThread = Script.RegisterLooped(function()
         if currentTimestamp - last_logger_scan_timestamp >= LOGGER_SCAN_INTERVAL_SECONDS then
             last_logger_scan_timestamp = currentTimestamp
 
-            if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
-                create_empty_file(SCRIPT_LOG__PATH)
-            end
-
-            local log__content, err = read_file(SCRIPT_LOG__PATH)
-            if err then
-                handle_script_exit({ hasScriptCrashed = true })
-                return
-            end
-
-            if is_file_string_need_newline_ending(log__content) then
-                local file, err = io.open(SCRIPT_LOG__PATH, "a")
-                if err then
-                    handle_script_exit({ hasScriptCrashed = true })
-                    return
-                end
-
-                file:write("\n")
-                file:close()
-            end
-
-            if Natives.InvokeBool(NATIVES.NETWORK.NETWORK_IS_SESSION_STARTED) then
+            -- Only scan if in an active online session; zero disk/CPU cost otherwise
+            if Natives.InvokeBool(NATIVE_NETWORK_IS_SESSION_STARTED) then
                 local player_entries_to_log = {}
-                local currentTimestamp = Time.GetEpoche()
 
                 for _, playerID in pairs(Players.Get()) do
-                    -- Getting the player SCID and IP in Cherax is cringe
                     local CNetGamePlayer = Players.GetById(playerID)
                     if CNetGamePlayer then
                         local GamerInfo = CNetGamePlayer:GetGamerInfo()
-                        if GamerInfo then
-                            if GamerInfo.RockstarId then
-                                local playerSCID = GamerInfo.RockstarId
-                                local playerName = Players.GetName(playerID)
-                                local playerIPString = Players.GetIPString(playerID)
-                                if playerIPString then
-                                    local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)") -- cringe
+                        if GamerInfo and GamerInfo.RockstarId then
+                            local playerSCID = GamerInfo.RockstarId
+                            local playerName = Players.GetName(playerID)
+                            local playerIPString = Players.GetIPString(playerID)
 
-                                    loggerPreTask(player_entries_to_log, log__content, currentTimestamp, playerSCID, playerName, playerIP)
-
-                                    Script.Yield()
+                            if playerIPString then
+                                local playerIP = playerIPString:match("^(%d+%.%d+%.%d+%.%d+) %(Direct%)")
+                                if (
+                                    playerIP
+                                    and playerIP ~= "255.255.255.255"
+                                    and playerIP ~= "0.0.0.0"
+                                    and playerName
+                                    and playerName ~= ""
+                                ) then
+                                    local key = make_dedup_key(playerSCID, playerIP, playerName)
+                                    if not logged_players[key] then
+                                        logged_players[key] = true
+                                        player_entries_to_log[#player_entries_to_log + 1] = string.format(
+                                            "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                            playerName, playerSCID, playerIP, currentTimestamp
+                                        )
+                                    end
                                 end
                             end
                         end
