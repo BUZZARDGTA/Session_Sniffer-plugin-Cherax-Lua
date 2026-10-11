@@ -27,8 +27,6 @@ local function handle_script_exit(params)
     SetShouldUnload()
 end
 
-
-
 local function make_dedup_key(scid, ip, name)
     return scid .. ":" .. ip .. ":" .. name
 end
