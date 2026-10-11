@@ -21,7 +21,7 @@ local FEATURE_SESSION_SNIFFER_LOGGING_HASH <const> = Utils.Joaat("SessionSniffer
 local function handle_script_exit(params)
     params = params or {}
     if params.hasScriptCrashed then
-        GUI.AddToast(SCRIPT_TITLE, "Oh no... Script crashed:(\nYou gotta restart it manually.", 10000)
+        GUI.AddToast(SCRIPT_TITLE, "Oh no... Script crashed:(\nYou gotta restart it manually.", 10000, eToastPos.BOTTOM_RIGHT)
     end
 
     SetShouldUnload()
@@ -41,7 +41,7 @@ local function init_log_cache()
 
     if not FileMgr.DoesFileExist(SCRIPT_LOG__PATH) then
         FileMgr.WriteFileContent(SCRIPT_LOG__PATH, "", false)
-        GUI.AddToast(SCRIPT_TITLE, "Initialized new log file.", 5000)
+        GUI.AddToast(SCRIPT_TITLE, "Initialized new log file.", 5000, eToastPos.BOTTOM_RIGHT)
         return
     end
 
@@ -70,7 +70,8 @@ local function init_log_cache()
     GUI.AddToast(
         SCRIPT_TITLE,
         string.format("Loaded %d unique player%s from log.", loaded_count, loaded_count == 1 and "" or "s"),
-        5000
+        5000,
+        eToastPos.BOTTOM_RIGHT
     )
 end
 
@@ -109,6 +110,10 @@ end)
 
 -- === Main Loop ===
 mainLoopThread = Script.RegisterLooped(function()
+    if ShouldUnload() then
+        return
+    end
+
     if FeatureMgr.IsFeatureToggled(FEATURE_SESSION_SNIFFER_LOGGING_HASH) then
         local currentTimestamp = Time.GetEpoche()
 
