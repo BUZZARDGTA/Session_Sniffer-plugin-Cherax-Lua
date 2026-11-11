@@ -8,8 +8,7 @@
 local mainLoopThread = nil
 local last_player_scan_timestamp = 0
 local logged_players = {}
-local session_relay_players = {}
-local session_relay_entries = {}
+local active_relay_timestamps = {}
 local last_written_host_key = nil
 local last_written_relays_key = nil
 
@@ -72,9 +71,8 @@ local function write_session_relays_file(relays_key, relays_content)
 end
 
 local function clear_session_relays()
-    if next(session_relay_players) ~= nil then
-        session_relay_players = {}
-        session_relay_entries = {}
+    if next(active_relay_timestamps) ~= nil then
+        active_relay_timestamps = {}
     end
     write_session_relays_file("", "")
 end
@@ -199,6 +197,8 @@ mainLoopThread = Script.RegisterLooped(function()
             last_player_scan_timestamp = currentTimestamp
 
             local player_entries_to_log = nil
+            local next_relay_timestamps = nil
+            local current_relay_entries = nil
             local host_key = ""
             local host_entry = ""
             local hostPlayerID = nil
@@ -223,11 +223,11 @@ mainLoopThread = Script.RegisterLooped(function()
                                 local playerName = CNetGamePlayer:GetName()
                                 if playerName and playerName ~= "" and playerName ~= "**Invalid**" then
                                     local key = make_dedup_key(playerSCID, playerIP, playerName)
-                                    local formatted_entry = string.format(
-                                        "user:%s, scid:%d, ip:%s, timestamp:%d",
-                                        playerName, playerSCID, playerIP, currentTimestamp
-                                    )
                                     if directIP then
+                                        local formatted_entry = string.format(
+                                            "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                            playerName, playerSCID, playerIP, currentTimestamp
+                                        )
                                         if logPlayersEnabled and not logged_players[key] then
                                             logged_players[key] = true
                                             player_entries_to_log = player_entries_to_log or {}
@@ -237,9 +237,17 @@ mainLoopThread = Script.RegisterLooped(function()
                                             host_key = key
                                             host_entry = formatted_entry .. "\n"
                                         end
-                                    elseif relayIP and trackRelaysEnabled and not session_relay_players[key] then
-                                        session_relay_players[key] = true
-                                        session_relay_entries[#session_relay_entries + 1] = formatted_entry
+                                    elseif relayIP and trackRelaysEnabled then
+                                        next_relay_timestamps = next_relay_timestamps or {}
+                                        if not next_relay_timestamps[key] then
+                                            local entryTimestamp = active_relay_timestamps[key] or currentTimestamp
+                                            next_relay_timestamps[key] = entryTimestamp
+                                            current_relay_entries = current_relay_entries or {}
+                                            current_relay_entries[#current_relay_entries + 1] = string.format(
+                                                "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                                playerName, playerSCID, playerIP, entryTimestamp
+                                            )
+                                        end
                                     end
                                 end
                             end
@@ -257,7 +265,8 @@ mainLoopThread = Script.RegisterLooped(function()
             end
 
             if trackRelaysEnabled then
-                local relays_content = #session_relay_entries > 0 and (table.concat(session_relay_entries, "\n") .. "\n") or ""
+                active_relay_timestamps = next_relay_timestamps or {}
+                local relays_content = current_relay_entries and (table.concat(current_relay_entries, "\n") .. "\n") or ""
                 write_session_relays_file(relays_content, relays_content)
             end
         end
