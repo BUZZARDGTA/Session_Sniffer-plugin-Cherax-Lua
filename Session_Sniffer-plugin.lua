@@ -8,7 +8,7 @@
 local mainLoopThread = nil
 local last_player_scan_timestamp = 0
 local logged_players = {}
-local active_relay_timestamps = {}
+local active_relay_entries = {}
 local last_written_host_key = nil
 local last_written_relays_key = nil
 
@@ -71,8 +71,8 @@ local function write_session_relays_file(relays_key, relays_content)
 end
 
 local function clear_session_relays()
-    if next(active_relay_timestamps) ~= nil then
-        active_relay_timestamps = {}
+    if next(active_relay_entries) ~= nil then
+        active_relay_entries = {}
     end
     write_session_relays_file("", "")
 end
@@ -197,8 +197,8 @@ mainLoopThread = Script.RegisterLooped(function()
             last_player_scan_timestamp = currentTimestamp
 
             local player_entries_to_log = nil
-            local next_relay_timestamps = nil
-            local current_relay_entries = nil
+            local next_relay_entries = nil
+            local current_relay_list = nil
             local host_key = ""
             local host_entry = ""
             local hostPlayerID = nil
@@ -224,29 +224,35 @@ mainLoopThread = Script.RegisterLooped(function()
                                 if playerName and playerName ~= "" and playerName ~= "**Invalid**" then
                                     local key = make_dedup_key(playerSCID, playerIP, playerName)
                                     if directIP then
-                                        local formatted_entry = string.format(
-                                            "user:%s, scid:%d, ip:%s, timestamp:%d",
-                                            playerName, playerSCID, playerIP, currentTimestamp
-                                        )
-                                        if logPlayersEnabled and not logged_players[key] then
-                                            logged_players[key] = true
-                                            player_entries_to_log = player_entries_to_log or {}
-                                            player_entries_to_log[#player_entries_to_log + 1] = formatted_entry
-                                        end
-                                        if trackHostEnabled and playerID == hostPlayerID then
+                                        local shouldLogPlayer = logPlayersEnabled and not logged_players[key]
+                                        local isTrackedHost = trackHostEnabled and playerID == hostPlayerID
+                                        if isTrackedHost then
                                             host_key = key
-                                            host_entry = formatted_entry .. "\n"
+                                        end
+                                        if shouldLogPlayer or (isTrackedHost and key ~= last_written_host_key) then
+                                            local formatted_entry = string.format(
+                                                "user:%s, scid:%d, ip:%s, timestamp:%d",
+                                                playerName, playerSCID, playerIP, currentTimestamp
+                                            )
+                                            if shouldLogPlayer then
+                                                logged_players[key] = true
+                                                player_entries_to_log = player_entries_to_log or {}
+                                                player_entries_to_log[#player_entries_to_log + 1] = formatted_entry
+                                            end
+                                            if isTrackedHost then
+                                                host_entry = formatted_entry .. "\n"
+                                            end
                                         end
                                     elseif relayIP and trackRelaysEnabled then
-                                        next_relay_timestamps = next_relay_timestamps or {}
-                                        if not next_relay_timestamps[key] then
-                                            local entryTimestamp = active_relay_timestamps[key] or currentTimestamp
-                                            next_relay_timestamps[key] = entryTimestamp
-                                            current_relay_entries = current_relay_entries or {}
-                                            current_relay_entries[#current_relay_entries + 1] = string.format(
+                                        next_relay_entries = next_relay_entries or {}
+                                        if not next_relay_entries[key] then
+                                            local relay_entry = active_relay_entries[key] or string.format(
                                                 "user:%s, scid:%d, ip:%s, timestamp:%d",
-                                                playerName, playerSCID, playerIP, entryTimestamp
+                                                playerName, playerSCID, playerIP, currentTimestamp
                                             )
+                                            next_relay_entries[key] = relay_entry
+                                            current_relay_list = current_relay_list or {}
+                                            current_relay_list[#current_relay_list + 1] = relay_entry
                                         end
                                     end
                                 end
@@ -265,8 +271,8 @@ mainLoopThread = Script.RegisterLooped(function()
             end
 
             if trackRelaysEnabled then
-                active_relay_timestamps = next_relay_timestamps or {}
-                local relays_content = current_relay_entries and (table.concat(current_relay_entries, "\n") .. "\n") or ""
+                active_relay_entries = next_relay_entries or {}
+                local relays_content = current_relay_list and (table.concat(current_relay_list, "\n") .. "\n") or ""
                 write_session_relays_file(relays_content, relays_content)
             end
         end
